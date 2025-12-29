@@ -16,18 +16,18 @@
         .tag { background-color: #e5d5c0; color: #333; padding: 4px 8px; border-radius: 999px; font-size: 0.8rem; }
         .location-link { color: #2563eb; text-decoration: underline; }
         .location-link:hover { color: #1d4ed8; }
-        .edit-button { background-color: #a0a0a0; padding: 4px 8px; font-size: 0.8rem; }
+        .edit-button { background-color: #a0a0a0; color: #fff; padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; }
         .edit-button:hover { background-color: #909090; }
     </style>
 </head>
 <body class="max-w-md mx-auto p-4">
     <div id="app">
         <!-- Navigation Tabs -->
-        <div class="flex justify-around mb-4 border-b border-gray-200">
+        <div class="flex justify-around mb-4 border-b border-gray-200 bg-white sticky top-0 z-10 py-2">
             <button @click="currentTab = 'schedule'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'schedule' }" class="pb-2 px-4">Schedule</button>
             <button @click="currentTab = 'map'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'map' }" class="pb-2 px-4">Map</button>
             <button @click="currentTab = 'accounting'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'accounting' }" class="pb-2 px-4">Expenses</button>
-            <button @click="currentTab = 'shopping'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'shopping' }" class="pb-2 px-4">Shopping List</button>
+            <button @click="currentTab = 'shopping'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'shopping' }" class="pb-2 px-4">Shopping</button>
         </div>
 
         <!-- Schedule Tab -->
@@ -38,12 +38,12 @@
             </div>
 
             <div v-for="(item, index) in sortedSchedule" :key="index">
-                <!-- Flight Card -->
+                <!-- Flight -->
                 <div v-if="item.type === 'flight'" class="muji-card mb-4 border-l-4 border-amber-700">
                     <div class="flex justify-between items-center mb-3">
                         <span class="font-bold text-lg">{{ item.flightNumber }} • {{ item.airline }}</span>
                         <div>
-                            <button @click="startEditSchedule(index)" class="edit-button text-white mr-2">Edit</button>
+                            <button @click="startEditSchedule(index)" class="edit-button mr-2">Edit</button>
                             <button @click="removeSchedule(index)" class="text-red-500 text-sm">Delete</button>
                         </div>
                     </div>
@@ -83,16 +83,16 @@
                             <p v-if="item.notes" class="text-sm muji-text mt-2"><strong>Notes:</strong> {{ item.notes }}</p>
                         </div>
                         <div>
-                            <button @click="startEditSchedule(index)" class="edit-button text-white mr-2">Edit</button>
+                            <button @click="startEditSchedule(index)" class="edit-button mr-2">Edit</button>
                             <button @click="removeSchedule(index)" class="text-red-500 text-sm">Delete</button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Add / Edit Form -->
-            <div class="mt-6">
-                <h3 class="font-semibold mb-3">{{ editScheduleIndex !== null ? 'Edit Item' : 'Add New' }}</h3>
+            <!-- Add/Edit Form -->
+            <div class="mt-8">
+                <h3 class="font-semibold mb-4">{{ editScheduleIndex !== null ? 'Edit Item' : 'Add New' }}</h3>
                 <select v-model="newSchedule.type" class="border p-2 mb-3 w-full rounded">
                     <option value="normal">General Activity</option>
                     <option value="flight">Flight</option>
@@ -104,7 +104,7 @@
                 </div>
 
                 <div v-if="newSchedule.type === 'flight'">
-                    <div class="grid grid-cols-2 gap-2 mb-2">
+                    <div class="grid grid-cols-2 gap-2 mb-3">
                         <div>
                             <p class="text-sm muji-text mb-1">Departure Date</p>
                             <input type="date" v-model="newSchedule.departDate" class="border p-2 w-full rounded" required>
@@ -152,7 +152,15 @@
             </div>
         </div>
 
-        <!-- Expenses Tab with Edit -->
+        <!-- Map Tab -->
+        <div v-if="currentTab === 'map'" class="muji-card">
+            <h2 class="text-lg font-bold mb-4">Map & Navigation</h2>
+            <input v-model="destination" placeholder="Enter destination" class="border p-2 mb-2 w-full rounded">
+            <button @click="navigateToDestination" class="muji-button mb-4 w-full">Navigate</button>
+            <div id="map" class="h-80 w-full rounded-lg overflow-hidden"></div>
+        </div>
+
+        <!-- Expenses Tab -->
         <div v-if="currentTab === 'accounting'" class="muji-card">
             <h2 class="text-lg font-bold mb-4">Expenses</h2>
 
@@ -168,15 +176,14 @@
                         </div>
                     </div>
                     <div>
-                        <button @click="startEditAccounting(index)" class="edit-button text-white mr-2">Edit</button>
+                        <button @click="startEditAccounting(index)" class="edit-button mr-2">Edit</button>
                         <button @click="removeAccounting(index)" class="text-red-500 text-sm">Delete</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Add / Edit Expense Form -->
-            <div class="mt-6">
-                <h3 class="font-semibold mb-3">{{ editAccountingIndex !== null ? 'Edit Expense' : 'Add Expense' }}</h3>
+            <div class="mt-8">
+                <h3 class="font-semibold mb-4">{{ editAccountingIndex !== null ? 'Edit Expense' : 'Add Expense' }}</h3>
                 <input type="date" v-model="newAccounting.date" class="border p-2 mb-2 w-full rounded" required>
                 <input type="time" v-model="newAccounting.time" class="border p-2 mb-2 w-full rounded">
                 <select v-model="newAccounting.person" class="border p-2 mb-2 w-full rounded">
@@ -193,42 +200,34 @@
                 </select>
                 <input v-model="newAccounting.description" placeholder="Description" class="border p-2 mb-2 w-full rounded" required>
                 <input v-model="newAccounting.store" placeholder="Store / Shop (optional)" class="border p-2 mb-2 w-full rounded">
-                <div class="flex gap-2">
+                <div class="flex gap-2 mt-4">
                     <button @click="saveAccounting" class="muji-button flex-1">{{ editAccountingIndex !== null ? 'Save Changes' : 'Add Expense' }}</button>
                     <button v-if="editAccountingIndex !== null" @click="cancelEditAccounting" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
                 </div>
             </div>
         </div>
 
-        <!-- Shopping List with Edit -->
+        <!-- Shopping List Tab -->
         <div v-if="currentTab === 'shopping'" class="muji-card">
             <h2 class="text-lg font-bold mb-4">Shopping List</h2>
             <ul class="mb-6">
                 <li v-for="(item, index) in shoppingList" :key="index" class="mb-3 flex justify-between items-center">
                     <span>{{ item }}</span>
                     <div>
-                        <button @click="startEditShopping(index)" class="edit-button text-white mr-2">Edit</button>
+                        <button @click="startEditShopping(index)" class="edit-button mr-2">Edit</button>
                         <button @click="removeShopping(index)" class="text-red-500 text-sm">Delete</button>
                     </div>
                 </li>
             </ul>
 
-            <div class="mt-6">
-                <h3 class="font-semibold mb-3">{{ editShoppingIndex !== null ? 'Edit Item' : 'Add New Item' }}</h3>
+            <div class="mt-8">
+                <h3 class="font-semibold mb-4">{{ editShoppingIndex !== null ? 'Edit Item' : 'Add New Item' }}</h3>
                 <input v-model="newShopping" placeholder="Item name" class="border p-2 mb-2 w-full rounded">
-                <div class="flex gap-2">
+                <div class="flex gap-2 mt-4">
                     <button @click="saveShopping" class="muji-button flex-1">{{ editShoppingIndex !== null ? 'Save Changes' : 'Add' }}</button>
                     <button v-if="editShoppingIndex !== null" @click="cancelEditShopping" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
                 </div>
             </div>
-        </div>
-
-        <!-- Map Tab unchanged -->
-        <div v-if="currentTab === 'map'" class="muji-card">
-            <h2 class="text-lg font-bold mb-4">Map & Navigation</h2>
-            <input v-model="destination" placeholder="Enter destination" class="border p-2 mb-2 w-full rounded">
-            <button @click="navigateToDestination" class="muji-button mb-4">Navigate</button>
-            <div id="map" class="h-64 w-full rounded-lg overflow-hidden"></div>
         </div>
     </div>
 
@@ -263,8 +262,7 @@
                     return [...this.schedule].sort((a, b) => {
                         const dateA = a.type === 'flight' ? a.departDate : a.date;
                         const dateB = b.type === 'flight' ? b.departDate : b.date;
-                        if (dateA !== dateB) return dateA.localeCompare(dateB);
-                        return 0;
+                        return dateA.localeCompare(dateB);
                     });
                 },
                 sortedAccounting() {
@@ -285,8 +283,7 @@
                 },
                 startEditSchedule(index) {
                     this.editScheduleIndex = index;
-                    this.newSchedule = { ...this.schedule[index] };
-                    this.newSchedule.people = [...this.schedule[index].people];
+                    this.newSchedule = { ...this.schedule[index], people: [...this.schedule[index].people] };
                 },
                 cancelEditSchedule() {
                     this.editScheduleIndex = null;
@@ -294,13 +291,17 @@
                 },
                 saveSchedule() {
                     if (this.newSchedule.people.length > 0) {
-                        if (this.editScheduleIndex !== null) {
-                            this.schedule[this.editScheduleIndex] = { ...this.newSchedule };
-                            this.editScheduleIndex = null;
-                        } else {
-                            this.schedule.push({ ...this.newSchedule });
+                        const valid = (this.newSchedule.type === 'normal' && this.newSchedule.date && this.newSchedule.time && this.newSchedule.event) ||
+                                      (this.newSchedule.type === 'flight' && this.newSchedule.departDate && this.newSchedule.departTime && this.newSchedule.arriveTime && this.newSchedule.flightNumber);
+                        if (valid) {
+                            if (this.editScheduleIndex !== null) {
+                                this.schedule[this.editScheduleIndex] = { ...this.newSchedule };
+                                this.editScheduleIndex = null;
+                            } else {
+                                this.schedule.push({ ...this.newSchedule });
+                            }
+                            this.resetNewSchedule();
                         }
-                        this.resetNewSchedule();
                     }
                 },
                 resetNewSchedule() {
@@ -350,7 +351,7 @@
                 },
                 removeShopping(index) { this.shoppingList.splice(index, 1); },
                 async fetchWeather() {
-                    const apiKey = 'YOUR_OPENWEATHER_API_KEY';
+                    const apiKey = 'YOUR_OPENWEATHER_API_KEY'; // 如需天氣請填
                     const city = 'Taipei';
                     const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`;
                     try {
@@ -369,11 +370,11 @@
                     if (!this.destination) return;
                     navigator.geolocation.getCurrentPosition(position => {
                         const origin = { lat: position.coords.latitude, lng: position.coords.longitude };
-                        const request = { origin: origin, destination: this.destination, travelMode: 'DRIVING' };
+                        const request = { origin, destination: this.destination, travelMode: 'DRIVING' };
                         this.directionsService.route(request, (result, status) => {
                             if (status === 'OK') this.directionsRenderer.setDirections(result);
                         });
-                    });
+                    }, () => alert('Please allow location access for navigation'));
                 }
             },
             mounted() {
