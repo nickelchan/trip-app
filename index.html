@@ -16,6 +16,8 @@
         .tag { background-color: #e5d5c0; color: #333; padding: 4px 8px; border-radius: 999px; font-size: 0.8rem; }
         .location-link { color: #2563eb; text-decoration: underline; }
         .location-link:hover { color: #1d4ed8; }
+        .edit-button { background-color: #a0a0a0; padding: 4px 8px; font-size: 0.8rem; }
+        .edit-button:hover { background-color: #909090; }
     </style>
 </head>
 <body class="max-w-md mx-auto p-4">
@@ -35,13 +37,15 @@
                 <p>Today's Weather: {{ weather.description }}, Temp: {{ weather.temp }}°C</p>
             </div>
 
-            <!-- Sorted Items -->
             <div v-for="(item, index) in sortedSchedule" :key="index">
                 <!-- Flight Card -->
                 <div v-if="item.type === 'flight'" class="muji-card mb-4 border-l-4 border-amber-700">
                     <div class="flex justify-between items-center mb-3">
                         <span class="font-bold text-lg">{{ item.flightNumber }} • {{ item.airline }}</span>
-                        <button @click="removeSchedule(index)" class="text-red-500 text-sm">Delete</button>
+                        <div>
+                            <button @click="startEditSchedule(index)" class="edit-button text-white mr-2">Edit</button>
+                            <button @click="removeSchedule(index)" class="text-red-500 text-sm">Delete</button>
+                        </div>
                     </div>
                     <p class="text-sm muji-text mb-2">{{ formatFlightDate(item.departDate, item.arriveDate) }}</p>
                     <div class="grid grid-cols-2 gap-4 mb-3">
@@ -78,139 +82,305 @@
                             </div>
                             <p v-if="item.notes" class="text-sm muji-text mt-2"><strong>Notes:</strong> {{ item.notes }}</p>
                         </div>
-                        <button @click="removeSchedule(index)" class="text-red-500 text-sm">Delete</button>
+                        <div>
+                            <button @click="startEditSchedule(index)" class="edit-button text-white mr-2">Edit</button>
+                            <button @click="removeSchedule(index)" class="text-red-500 text-sm">Delete</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Add New Schedule -->
-            <select v-model="newSchedule.type" class="border p-2 mb-3 w-full rounded">
-                <option value="normal">General Activity</option>
-                <option value="flight">Flight</option>
-            </select>
+            <!-- Add / Edit Form -->
+            <div class="mt-6">
+                <h3 class="font-semibold mb-3">{{ editScheduleIndex !== null ? 'Edit Item' : 'Add New' }}</h3>
+                <select v-model="newSchedule.type" class="border p-2 mb-3 w-full rounded">
+                    <option value="normal">General Activity</option>
+                    <option value="flight">Flight</option>
+                </select>
 
-            <!-- General Activity: Date & Time -->
-            <div v-if="newSchedule.type === 'normal'">
-                <input type="date" v-model="newSchedule.date" class="border p-2 mb-2 w-full rounded" required>
-                <input type="time" v-model="newSchedule.time" class="border p-2 mb-2 w-full rounded" required>
-            </div>
+                <div v-if="newSchedule.type === 'normal'">
+                    <input type="date" v-model="newSchedule.date" class="border p-2 mb-2 w-full rounded" required>
+                    <input type="time" v-model="newSchedule.time" class="border p-2 mb-2 w-full rounded" required>
+                </div>
 
-            <!-- Flight: Separate Depart & Arrive Dates -->
-            <div v-if="newSchedule.type === 'flight'">
-                <div class="grid grid-cols-2 gap-2 mb-2">
-                    <div>
-                        <p class="text-sm muji-text mb-1">Departure Date</p>
-                        <input type="date" v-model="newSchedule.departDate" class="border p-2 w-full rounded" required>
-                    </div>
-                    <div>
-                        <p class="text-sm muji-text mb-1">Arrival Date (if different)</p>
-                        <input type="date" v-model="newSchedule.arriveDate" class="border p-2 w-full rounded">
+                <div v-if="newSchedule.type === 'flight'">
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <div>
+                            <p class="text-sm muji-text mb-1">Departure Date</p>
+                            <input type="date" v-model="newSchedule.departDate" class="border p-2 w-full rounded" required>
+                        </div>
+                        <div>
+                            <p class="text-sm muji-text mb-1">Arrival Date (if different)</p>
+                            <input type="date" v-model="newSchedule.arriveDate" class="border p-2 w-full rounded">
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="mb-4">
-                <p class="text-sm muji-text mb-2">Who?</p>
-                <label class="flex items-center mb-2"><input type="checkbox" v-model="newSchedule.people" value="Nickel" class="mr-2"> Nickel</label>
-                <label class="flex items-center mb-2"><input type="checkbox" v-model="newSchedule.people" value="Lily" class="mr-2"> Lily</label>
-                <label class="flex items-center mb-2"><input type="checkbox" v-model="newSchedule.people" value="Candis" class="mr-2"> Candis</label>
-            </div>
+                <div class="mb-4">
+                    <p class="text-sm muji-text mb-2">Who?</p>
+                    <label class="flex items-center mb-2"><input type="checkbox" v-model="newSchedule.people" value="Nickel" class="mr-2"> Nickel</label>
+                    <label class="flex items-center mb-2"><input type="checkbox" v-model="newSchedule.people" value="Lily" class="mr-2"> Lily</label>
+                    <label class="flex items-center mb-2"><input type="checkbox" v-model="newSchedule.people" value="Candis" class="mr-2"> Candis</label>
+                </div>
 
-            <div v-if="newSchedule.type === 'normal'">
-                <input v-model="newSchedule.event" placeholder="Event" class="border p-2 mb-2 w-full rounded" required>
-                <input v-model="newSchedule.location" placeholder="Location (e.g. Taipei 101)" class="border p-2 mb-2 w-full rounded">
-            </div>
+                <div v-if="newSchedule.type === 'normal'">
+                    <input v-model="newSchedule.event" placeholder="Event" class="border p-2 mb-2 w-full rounded" required>
+                    <input v-model="newSchedule.location" placeholder="Location (e.g. Taipei 101)" class="border p-2 mb-2 w-full rounded">
+                </div>
 
-            <div v-if="newSchedule.type === 'flight'">
-                <input v-model="newSchedule.flightNumber" placeholder="Flight Number (e.g. CX123)" class="border p-2 mb-2 w-full rounded" required>
-                <input v-model="newSchedule.airline" placeholder="Airline" class="border p-2 mb-2 w-full rounded">
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <input v-model="newSchedule.departTime" placeholder="Depart Time (e.g. 14:00)" class="border p-2 mb-2 w-full rounded" required>
-                        <input v-model="newSchedule.departAirport" placeholder="Depart Airport (e.g. HKG)" class="border p-2 mb-2 w-full rounded" required>
-                    </div>
-                    <div>
-                        <input v-model="newSchedule.arriveTime" placeholder="Arrive Time (e.g. 16:00)" class="border p-2 mb-2 w-full rounded" required>
-                        <input v-model="newSchedule.arriveAirport" placeholder="Arrive Airport (e.g. TPE)" class="border p-2 mb-2 w-full rounded" required>
+                <div v-if="newSchedule.type === 'flight'">
+                    <input v-model="newSchedule.flightNumber" placeholder="Flight Number" class="border p-2 mb-2 w-full rounded" required>
+                    <input v-model="newSchedule.airline" placeholder="Airline" class="border p-2 mb-2 w-full rounded">
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <input v-model="newSchedule.departTime" placeholder="Depart Time" class="border p-2 mb-2 w-full rounded" required>
+                            <input v-model="newSchedule.departAirport" placeholder="Depart Airport" class="border p-2 mb-2 w-full rounded" required>
+                        </div>
+                        <div>
+                            <input v-model="newSchedule.arriveTime" placeholder="Arrive Time" class="border p-2 mb-2 w-full rounded" required>
+                            <input v-model="newSchedule.arriveAirport" placeholder="Arrive Airport" class="border p-2 mb-2 w-full rounded" required>
+                        </div>
                     </div>
                 </div>
+
+                <textarea v-model="newSchedule.notes" placeholder="Notes (optional)" class="border p-2 mb-3 w-full rounded h-24"></textarea>
+
+                <div class="flex gap-2">
+                    <button @click="saveSchedule" class="muji-button flex-1">{{ editScheduleIndex !== null ? 'Save Changes' : 'Add' }}</button>
+                    <button v-if="editScheduleIndex !== null" @click="cancelEditSchedule" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+                </div>
             </div>
-
-            <textarea v-model="newSchedule.notes" placeholder="Notes (optional)" class="border p-2 mb-3 w-full rounded h-24"></textarea>
-
-            <button @click="addSchedule" class="muji-button w-full mt-3">Add</button>
         </div>
 
-        <!-- Map, Expenses, Shopping Tabs unchanged (omitted for brevity, same as last version) -->
+        <!-- Expenses Tab with Edit -->
+        <div v-if="currentTab === 'accounting'" class="muji-card">
+            <h2 class="text-lg font-bold mb-4">Expenses</h2>
 
-        <script>
-            const { createApp } = Vue;
-            createApp({
-                data() {
-                    return {
-                        currentTab: 'schedule',
-                        schedule: [],
-                        newSchedule: {
-                            type: 'normal',
-                            date: '', time: '',
-                            event: '', location: '',
-                            flightNumber: '', airline: '',
-                            departDate: '', departTime: '', departAirport: '',
-                            arriveDate: '', arriveTime: '', arriveAirport: '',
-                            notes: '', people: []
-                        },
-                        // ... other data (accounting, shoppingList, etc.)
-                    };
+            <div v-for="(entry, index) in sortedAccounting" :key="index" class="muji-card mb-4">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <p class="font-semibold text-lg">{{ entry.amount }} {{ entry.currency }}</p>
+                        <p class="text-sm muji-text">{{ formatDate(entry.date) }} {{ entry.time || '' }}</p>
+                        <p>{{ entry.description }}</p>
+                        <p v-if="entry.store" class="text-sm muji-text mt-1"><strong>Store:</strong> {{ entry.store }}</p>
+                        <div class="flex gap-2 flex-wrap mt-2">
+                            <span class="tag">{{ entry.person }}</span>
+                        </div>
+                    </div>
+                    <div>
+                        <button @click="startEditAccounting(index)" class="edit-button text-white mr-2">Edit</button>
+                        <button @click="removeAccounting(index)" class="text-red-500 text-sm">Delete</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add / Edit Expense Form -->
+            <div class="mt-6">
+                <h3 class="font-semibold mb-3">{{ editAccountingIndex !== null ? 'Edit Expense' : 'Add Expense' }}</h3>
+                <input type="date" v-model="newAccounting.date" class="border p-2 mb-2 w-full rounded" required>
+                <input type="time" v-model="newAccounting.time" class="border p-2 mb-2 w-full rounded">
+                <select v-model="newAccounting.person" class="border p-2 mb-2 w-full rounded">
+                    <option>Nickel</option>
+                    <option>Lily</option>
+                    <option>Candis</option>
+                </select>
+                <input v-model="newAccounting.amount" type="number" placeholder="Amount" class="border p-2 mb-2 w-full rounded" required>
+                <select v-model="newAccounting.currency" class="border p-2 mb-2 w-full rounded">
+                    <option value="HKD">HKD</option>
+                    <option value="CAD">CAD</option>
+                    <option value="JPY">JPY</option>
+                    <option value="KRW">KRW</option>
+                </select>
+                <input v-model="newAccounting.description" placeholder="Description" class="border p-2 mb-2 w-full rounded" required>
+                <input v-model="newAccounting.store" placeholder="Store / Shop (optional)" class="border p-2 mb-2 w-full rounded">
+                <div class="flex gap-2">
+                    <button @click="saveAccounting" class="muji-button flex-1">{{ editAccountingIndex !== null ? 'Save Changes' : 'Add Expense' }}</button>
+                    <button v-if="editAccountingIndex !== null" @click="cancelEditAccounting" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shopping List with Edit -->
+        <div v-if="currentTab === 'shopping'" class="muji-card">
+            <h2 class="text-lg font-bold mb-4">Shopping List</h2>
+            <ul class="mb-6">
+                <li v-for="(item, index) in shoppingList" :key="index" class="mb-3 flex justify-between items-center">
+                    <span>{{ item }}</span>
+                    <div>
+                        <button @click="startEditShopping(index)" class="edit-button text-white mr-2">Edit</button>
+                        <button @click="removeShopping(index)" class="text-red-500 text-sm">Delete</button>
+                    </div>
+                </li>
+            </ul>
+
+            <div class="mt-6">
+                <h3 class="font-semibold mb-3">{{ editShoppingIndex !== null ? 'Edit Item' : 'Add New Item' }}</h3>
+                <input v-model="newShopping" placeholder="Item name" class="border p-2 mb-2 w-full rounded">
+                <div class="flex gap-2">
+                    <button @click="saveShopping" class="muji-button flex-1">{{ editShoppingIndex !== null ? 'Save Changes' : 'Add' }}</button>
+                    <button v-if="editShoppingIndex !== null" @click="cancelEditShopping" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Tab unchanged -->
+        <div v-if="currentTab === 'map'" class="muji-card">
+            <h2 class="text-lg font-bold mb-4">Map & Navigation</h2>
+            <input v-model="destination" placeholder="Enter destination" class="border p-2 mb-2 w-full rounded">
+            <button @click="navigateToDestination" class="muji-button mb-4">Navigate</button>
+            <div id="map" class="h-64 w-full rounded-lg overflow-hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        createApp({
+            data() {
+                return {
+                    currentTab: 'schedule',
+                    schedule: [],
+                    newSchedule: {
+                        type: 'normal', date: '', time: '', event: '', location: '',
+                        flightNumber: '', airline: '', departDate: '', departTime: '', departAirport: '',
+                        arriveDate: '', arriveTime: '', arriveAirport: '', notes: '', people: []
+                    },
+                    editScheduleIndex: null,
+                    accounting: [],
+                    newAccounting: { person: 'Nickel', amount: '', currency: 'HKD', description: '', store: '', date: '', time: '' },
+                    editAccountingIndex: null,
+                    shoppingList: [],
+                    newShopping: '',
+                    editShoppingIndex: null,
+                    weather: null,
+                    destination: '',
+                    map: null,
+                    directionsService: null,
+                    directionsRenderer: null
+                };
+            },
+            computed: {
+                sortedSchedule() {
+                    return [...this.schedule].sort((a, b) => {
+                        const dateA = a.type === 'flight' ? a.departDate : a.date;
+                        const dateB = b.type === 'flight' ? b.departDate : b.date;
+                        if (dateA !== dateB) return dateA.localeCompare(dateB);
+                        return 0;
+                    });
                 },
-                computed: {
-                    sortedSchedule() {
-                        return [...this.schedule].sort((a, b) => {
-                            const dateA = a.type === 'flight' ? a.departDate : a.date;
-                            const dateB = b.type === 'flight' ? b.departDate : b.date;
-                            if (dateA !== dateB) return dateA.localeCompare(dateB);
-                            return 0;
-                        });
+                sortedAccounting() {
+                    return [...this.accounting].sort((a, b) => b.date.localeCompare(a.date));
+                }
+            },
+            methods: {
+                formatDate(dateStr) {
+                    if (!dateStr) return '';
+                    const date = new Date(dateStr);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                },
+                formatFlightDate(depart, arrive) {
+                    if (!depart) return '';
+                    const d = this.formatDate(depart);
+                    if (arrive && depart !== arrive) return d + ' → ' + this.formatDate(arrive);
+                    return d;
+                },
+                startEditSchedule(index) {
+                    this.editScheduleIndex = index;
+                    this.newSchedule = { ...this.schedule[index] };
+                    this.newSchedule.people = [...this.schedule[index].people];
+                },
+                cancelEditSchedule() {
+                    this.editScheduleIndex = null;
+                    this.resetNewSchedule();
+                },
+                saveSchedule() {
+                    if (this.newSchedule.people.length > 0) {
+                        if (this.editScheduleIndex !== null) {
+                            this.schedule[this.editScheduleIndex] = { ...this.newSchedule };
+                            this.editScheduleIndex = null;
+                        } else {
+                            this.schedule.push({ ...this.newSchedule });
+                        }
+                        this.resetNewSchedule();
                     }
                 },
-                methods: {
-                    formatDate(dateStr) {
-                        if (!dateStr) return '';
-                        const date = new Date(dateStr);
-                        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                    },
-                    formatFlightDate(depart, arrive) {
-                        if (!depart) return '';
-                        const d = this.formatDate(depart);
-                        if (arrive && depart !== arrive) {
-                            return d + ' → ' + this.formatDate(arrive);
-                        }
-                        return d;
-                    },
-                    addSchedule() {
-                        if (this.newSchedule.people.length > 0) {
-                            if (this.newSchedule.type === 'normal') {
-                                if (this.newSchedule.date && this.newSchedule.time && this.newSchedule.event) {
-                                    this.schedule.push({ ...this.newSchedule });
-                                }
-                            } else if (this.newSchedule.type === 'flight') {
-                                if (this.newSchedule.departDate && this.newSchedule.departTime && this.newSchedule.arriveTime && this.newSchedule.flightNumber) {
-                                    this.schedule.push({ ...this.newSchedule });
-                                }
-                            }
-                            this.newSchedule = { type: 'normal', date: '', time: '', event: '', location: '',
-                                flightNumber: '', airline: '', departDate: '', departTime: '', departAirport: '',
-                                arriveDate: '', arriveTime: '', arriveAirport: '', notes: '', people: [] };
-                        }
-                    },
-                    removeSchedule(index) { this.schedule.splice(index, 1); },
-                    // ... other methods unchanged
+                resetNewSchedule() {
+                    this.newSchedule = { type: 'normal', date: '', time: '', event: '', location: '',
+                        flightNumber: '', airline: '', departDate: '', departTime: '', departAirport: '',
+                        arriveDate: '', arriveTime: '', arriveAirport: '', notes: '', people: [] };
                 },
-                mounted() {
-                    this.fetchWeather();
-                    window.initMap = this.initMap;
+                removeSchedule(index) { this.schedule.splice(index, 1); },
+                startEditAccounting(index) {
+                    this.editAccountingIndex = index;
+                    this.newAccounting = { ...this.accounting[index] };
+                },
+                cancelEditAccounting() {
+                    this.editAccountingIndex = null;
+                    this.newAccounting = { person: 'Nickel', amount: '', currency: 'HKD', description: '', store: '', date: '', time: '' };
+                },
+                saveAccounting() {
+                    if (this.newAccounting.date && this.newAccounting.amount && this.newAccounting.description) {
+                        if (this.editAccountingIndex !== null) {
+                            this.accounting[this.editAccountingIndex] = { ...this.newAccounting };
+                            this.editAccountingIndex = null;
+                        } else {
+                            this.accounting.push({ ...this.newAccounting });
+                        }
+                        this.newAccounting = { person: 'Nickel', amount: '', currency: 'HKD', description: '', store: '', date: '', time: '' };
+                    }
+                },
+                removeAccounting(index) { this.accounting.splice(index, 1); },
+                startEditShopping(index) {
+                    this.editShoppingIndex = index;
+                    this.newShopping = this.shoppingList[index];
+                },
+                cancelEditShopping() {
+                    this.editShoppingIndex = null;
+                    this.newShopping = '';
+                },
+                saveShopping() {
+                    if (this.newShopping.trim()) {
+                        if (this.editShoppingIndex !== null) {
+                            this.shoppingList[this.editShoppingIndex] = this.newShopping;
+                            this.editShoppingIndex = null;
+                        } else {
+                            this.shoppingList.push(this.newShopping);
+                        }
+                        this.newShopping = '';
+                    }
+                },
+                removeShopping(index) { this.shoppingList.splice(index, 1); },
+                async fetchWeather() {
+                    const apiKey = 'YOUR_OPENWEATHER_API_KEY';
+                    const city = 'Taipei';
+                    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`;
+                    try {
+                        const response = await fetch(url);
+                        const data = await response.json();
+                        this.weather = { description: data.weather[0].description, temp: Math.round(data.main.temp) };
+                    } catch (error) { console.error('Weather error:', error); }
+                },
+                initMap() {
+                    this.map = new google.maps.Map(document.getElementById('map'), { center: { lat: 25.0330, lng: 121.5654 }, zoom: 12 });
+                    this.directionsService = new google.maps.DirectionsService();
+                    this.directionsRenderer = new google.maps.DirectionsRenderer();
+                    this.directionsRenderer.setMap(this.map);
+                },
+                navigateToDestination() {
+                    if (!this.destination) return;
+                    navigator.geolocation.getCurrentPosition(position => {
+                        const origin = { lat: position.coords.latitude, lng: position.coords.longitude };
+                        const request = { origin: origin, destination: this.destination, travelMode: 'DRIVING' };
+                        this.directionsService.route(request, (result, status) => {
+                            if (status === 'OK') this.directionsRenderer.setDirections(result);
+                        });
+                    });
                 }
-            }).mount('#app');
-        </script>
-    </div>
+            },
+            mounted() {
+                this.fetchWeather();
+                window.initMap = this.initMap;
+            }
+        }).mount('#app');
+    </script>
 </body>
 </html>
