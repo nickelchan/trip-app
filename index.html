@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MUJI Style Trip App</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue.js CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <!-- Google Maps API (Replace YOUR_API_KEY with your actual key) -->
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap"></script>
+    <!-- OpenWeatherMap API for weather (We'll use fetch in code) -->
+    <style>
+        /* MUJI-inspired styles: Simple, clean, natural tones */
+        body {
+            background-color: #f5f5f5; /* Light beige */
+            color: #333; /* Dark gray */
+            font-family: 'Helvetica', sans-serif;
+        }
+        .muji-card {
+            background-color: #fff; /* White */
+            border: 1px solid #e0e0e0; /* Light border */
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .muji-button {
+            background-color: #d2b48c; /* Tan/Brown MUJI tone */
+            color: #fff;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .muji-button:hover {
+            background-color: #c0a080;
+        }
+        .muji-text {
+            color: #808080; /* Muted gray */
+        }
+    </style>
+</head>
+<body class="max-w-md mx-auto p-4">
+    <div id="app">
+        <!-- Navigation Tabs for mobile-like feel -->
+        <div class="flex justify-around mb-4 border-b border-gray-200">
+            <button @click="currentTab = 'schedule'" :class="{ 'font-bold border-b-2 border-tan-500': currentTab === 'schedule' }" class="pb-2">行程表</button>
+            <button @click="currentTab = 'map'" :class="{ 'font-bold border-b-2 border-tan-500': currentTab === 'map' }" class="pb-2">地圖</button>
+            <button @click="currentTab = 'accounting'" :class="{ 'font-bold border-b-2 border-tan-500': currentTab === 'accounting' }" class="pb-2">記帳</button>
+            <button @click="currentTab = 'shopping'" :class="{ 'font-bold border-b-2 border-tan-500': currentTab === 'shopping' }" class="pb-2">購物清單</button>
+        </div>
+
+        <!-- Tab: Schedule -->
+        <div v-if="currentTab === 'schedule'" class="muji-card">
+            <h2 class="text-lg font-bold mb-4">行程表</h2>
+            <!-- Weather Display (Fetch on load) -->
+            <div v-if="weather" class="mb-4 muji-text">
+                <p>今日天氣: {{ weather.description }}，溫度: {{ weather.temp }}°C</p>
+            </div>
+            <ul>
+                <li v-for="(item, index) in schedule" :key="index" class="mb-2">
+                    {{ item.time }} - {{ item.event }}
+                    <button @click="removeSchedule(index)" class="text-red-500 ml-2">刪除</button>
+                </li>
+            </ul>
+            <input v-model="newSchedule.time" placeholder="時間 (e.g., 09:00)" class="border p-2 mb-2 w-full">
+            <input v-model="newSchedule.event" placeholder="事件" class="border p-2 mb-2 w-full">
+            <button @click="addSchedule" class="muji-button">新增行程</button>
+        </div>
+
+        <!-- Tab: Map -->
+        <div v-if="currentTab === 'map'" class="muji-card">
+            <h2 class="text-lg font-bold mb-4">地圖</h2>
+            <input v-model="destination" placeholder="輸入目的地" class="border p-2 mb-2 w-full">
+            <button @click="navigateToDestination" class="muji-button mb-4">導航</button>
+            <div id="map" class="h-64 w-full"></div>
+        </div>
+
+        <!-- Tab: Accounting -->
+        <div v-if="currentTab === 'accounting'" class="muji-card">
+            <h2 class="text-lg font-bold mb-4">記帳功能</h2>
+            <ul>
+                <li v-for="(entry, index) in accounting" :key="index" class="mb-2">
+                    {{ entry.person }}: {{ entry.amount }} 元 - {{ entry.description }}
+                    <button @click="removeAccounting(index)" class="text-red-500 ml-2">刪除</button>
+                </li>
+            </ul>
+            <select v-model="newAccounting.person" class="border p-2 mb-2 w-full">
+                <option>Nickel</option>
+                <option>Lily</option>
+                <option>Candis</option>
+            </select>
+            <input v-model="newAccounting.amount" type="number" placeholder="金額" class="border p-2 mb-2 w-full">
+            <input v-model="newAccounting.description" placeholder="描述" class="border p-2 mb-2 w-full">
+            <button @click="addAccounting" class="muji-button">新增支出</button>
+        </div>
+
+        <!-- Tab: Shopping List -->
+        <div v-if="currentTab === 'shopping'" class="muji-card">
+            <h2 class="text-lg font-bold mb-4">購物清單</h2>
+            <ul>
+                <li v-for="(item, index) in shoppingList" :key="index" class="mb-2">
+                    {{ item }}
+                    <button @click="removeShopping(index)" class="text-red-500 ml-2">刪除</button>
+                </li>
+            </ul>
+            <input v-model="newShopping" placeholder="新增項目" class="border p-2 mb-2 w-full">
+            <button @click="addShopping" class="muji-button">新增</button>
+        </div>
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    currentTab: 'schedule',
+                    schedule: [],
+                    newSchedule: { time: '', event: '' },
+                    accounting: [],
+                    newAccounting: { person: 'Nickel', amount: '', description: '' },
+                    shoppingList: [],
+                    newShopping: '',
+                    weather: null,
+                    destination: '',
+                    map: null,
+                    directionsService: null,
+                    directionsRenderer: null
+                };
+            },
+            methods: {
+                addSchedule() {
+                    if (this.newSchedule.time && this.newSchedule.event) {
+                        this.schedule.push({ ...this.newSchedule });
+                        this.newSchedule = { time: '', event: '' };
+                    }
+                },
+                removeSchedule(index) {
+                    this.schedule.splice(index, 1);
+                },
+                addAccounting() {
+                    if (this.newAccounting.amount && this.newAccounting.description) {
+                        this.accounting.push({ ...this.newAccounting });
+                        this.newAccounting = { person: 'Nickel', amount: '', description: '' };
+                    }
+                },
+                removeAccounting(index) {
+                    this.accounting.splice(index, 1);
+                },
+                addShopping() {
+                    if (this.newShopping) {
+                        this.shoppingList.push(this.newShopping);
+                        this.newShopping = '';
+                    }
+                },
+                removeShopping(index) {
+                    this.shoppingList.splice(index, 1);
+                },
+                async fetchWeather() {
+                    // Replace with your city and OpenWeatherMap API key
+                    const apiKey = 'YOUR_OPENWEATHER_API_KEY';
+                    const city = 'Taipei'; // Change to your location
+                    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=zh_tw`;
+                    try {
+                        const response = await fetch(url);
+                        const data = await response.json();
+                        this.weather = {
+                            description: data.weather[0].description,
+                            temp: data.main.temp
+                        };
+                    } catch (error) {
+                        console.error('Weather fetch error:', error);
+                    }
+                },
+                initMap() {
+                    this.map = new google.maps.Map(document.getElementById('map'), {
+                        center: { lat: 25.0330, lng: 121.5654 }, // Default to Taipei
+                        zoom: 12
+                    });
+                    this.directionsService = new google.maps.DirectionsService();
+                    this.directionsRenderer = new google.maps.DirectionsRenderer();
+                    this.directionsRenderer.setMap(this.map);
+                },
+                navigateToDestination() {
+                    if (this.destination) {
+                        navigator.geolocation.getCurrentPosition(position => {
+                            const origin = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+                            const request = {
+                                origin: origin,
+                                destination: this.destination,
+                                travelMode: 'DRIVING'
+                            };
+                            this.directionsService.route(request, (result, status) => {
+                                if (status === 'OK') {
+                                    this.directionsRenderer.setDirections(result);
+                                }
+                            });
+                        });
+                    }
+                }
+            },
+            mounted() {
+                this.fetchWeather();
+                window.initMap = this.initMap; // For Google Maps callback
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
