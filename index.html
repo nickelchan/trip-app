@@ -3,31 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MUJI Style Trip App</title>
+    <title>MUJI Trip Planner</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Vue.js CDN -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-    <!-- Google Maps API (Replace YOUR_API_KEY with your actual key) -->
+    <!-- Google Maps API (Replace YOUR_API_KEY) -->
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap"></script>
-    <!-- OpenWeatherMap API for weather (We'll use fetch in code) -->
     <style>
-        /* MUJI-inspired styles: Simple, clean, natural tones */
         body {
-            background-color: #f5f5f5; /* Light beige */
-            color: #333; /* Dark gray */
+            background-color: #f5f5f5;
+            color: #333;
             font-family: 'Helvetica', sans-serif;
         }
         .muji-card {
-            background-color: #fff; /* White */
-            border: 1px solid #e0e0e0; /* Light border */
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
             border-radius: 8px;
             padding: 16px;
             margin-bottom: 16px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.05);
         }
         .muji-button {
-            background-color: #d2b48c; /* Tan/Brown MUJI tone */
+            background-color: #d2b48c;
             color: #fff;
             padding: 8px 16px;
             border-radius: 4px;
@@ -37,76 +35,125 @@
             background-color: #c0a080;
         }
         .muji-text {
-            color: #808080; /* Muted gray */
+            color: #808080;
         }
     </style>
 </head>
 <body class="max-w-md mx-auto p-4">
     <div id="app">
-        <!-- Navigation Tabs for mobile-like feel -->
+        <!-- Navigation Tabs -->
         <div class="flex justify-around mb-4 border-b border-gray-200">
-            <button @click="currentTab = 'schedule'" :class="{ 'font-bold border-b-2 border-tan-500': currentTab === 'schedule' }" class="pb-2">行程表</button>
-            <button @click="currentTab = 'map'" :class="{ 'font-bold border-b-2 border-tan-500': currentTab === 'map' }" class="pb-2">地圖</button>
-            <button @click="currentTab = 'accounting'" :class="{ 'font-bold border-b-2 border-tan-500': currentTab === 'accounting' }" class="pb-2">記帳</button>
-            <button @click="currentTab = 'shopping'" :class="{ 'font-bold border-b-2 border-tan-500': currentTab === 'shopping' }" class="pb-2">購物清單</button>
+            <button @click="currentTab = 'schedule'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'schedule' }" class="pb-2 px-4">Schedule</button>
+            <button @click="currentTab = 'map'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'map' }" class="pb-2 px-4">Map</button>
+            <button @click="currentTab = 'accounting'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'accounting' }" class="pb-2 px-4">Expenses</button>
+            <button @click="currentTab = 'shopping'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'shopping' }" class="pb-2 px-4">Shopping List</button>
         </div>
 
         <!-- Tab: Schedule -->
         <div v-if="currentTab === 'schedule'" class="muji-card">
-            <h2 class="text-lg font-bold mb-4">行程表</h2>
-            <!-- Weather Display (Fetch on load) -->
+            <h2 class="text-lg font-bold mb-4">Schedule</h2>
+            <!-- Weather -->
             <div v-if="weather" class="mb-4 muji-text">
-                <p>今日天氣: {{ weather.description }}，溫度: {{ weather.temp }}°C</p>
+                <p>Today's Weather: {{ weather.description }}, Temp: {{ weather.temp }}°C</p>
             </div>
-            <ul>
-                <li v-for="(item, index) in schedule" :key="index" class="mb-2">
-                    {{ item.time }} - {{ item.event }}
-                    <button @click="removeSchedule(index)" class="text-red-500 ml-2">刪除</button>
+
+            <!-- Flight Cards -->
+            <div v-for="(item, index) in schedule.filter(i => i.type === 'flight')" :key="'flight'+index" class="muji-card mb-4 border-l-4 border-amber-700">
+                <div class="flex justify-between items-center mb-3">
+                    <span class="font-bold text-lg">{{ item.flightNumber }} • {{ item.airline }}</span>
+                    <button @click="removeSchedule(index)" class="text-red-500 text-sm">Delete</button>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-sm muji-text">Departure</p>
+                        <p class="font-semibold text-lg">{{ item.departTime }}</p>
+                        <p class="text-gray-600">{{ item.departAirport }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm muji-text">Arrival</p>
+                        <p class="font-semibold text-lg">{{ item.arriveTime }}</p>
+                        <p class="text-gray-600">{{ item.arriveAirport }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- General Activities -->
+            <ul class="mb-6">
+                <li v-for="(item, index) in schedule.filter(i => i.type !== 'flight')" :key="'normal'+index" class="mb-3 flex justify-between items-center">
+                    <span>{{ item.time }} - {{ item.event }}</span>
+                    <button @click="removeSchedule(index)" class="text-red-500 text-sm">Delete</button>
                 </li>
             </ul>
-            <input v-model="newSchedule.time" placeholder="時間 (e.g., 09:00)" class="border p-2 mb-2 w-full">
-            <input v-model="newSchedule.event" placeholder="事件" class="border p-2 mb-2 w-full">
-            <button @click="addSchedule" class="muji-button">新增行程</button>
+
+            <!-- Add New -->
+            <select v-model="newSchedule.type" class="border p-2 mb-3 w-full rounded">
+                <option value="normal">General Activity</option>
+                <option value="flight">Flight</option>
+            </select>
+
+            <!-- General -->
+            <div v-if="newSchedule.type === 'normal'">
+                <input v-model="newSchedule.time" placeholder="Time (e.g. 09:00)" class="border p-2 mb-2 w-full rounded">
+                <input v-model="newSchedule.event" placeholder="Event" class="border p-2 mb-2 w-full rounded">
+            </div>
+
+            <!-- Flight -->
+            <div v-if="newSchedule.type === 'flight'">
+                <input v-model="newSchedule.flightNumber" placeholder="Flight Number (e.g. CX123)" class="border p-2 mb-2 w-full rounded">
+                <input v-model="newSchedule.airline" placeholder="Airline" class="border p-2 mb-2 w-full rounded">
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <input v-model="newSchedule.departTime" placeholder="Depart Time (e.g. 14:00)" class="border p-2 mb-2 w-full rounded">
+                        <input v-model="newSchedule.departAirport" placeholder="Depart Airport (e.g. HKG)" class="border p-2 mb-2 w-full rounded">
+                    </div>
+                    <div>
+                        <input v-model="newSchedule.arriveTime" placeholder="Arrive Time (e.g. 16:00)" class="border p-2 mb-2 w-full rounded">
+                        <input v-model="newSchedule.arriveAirport" placeholder="Arrive Airport (e.g. TPE)" class="border p-2 mb-2 w-full rounded">
+                    </div>
+                </div>
+            </div>
+
+            <button @click="addSchedule" class="muji-button w-full mt-3">Add</button>
         </div>
 
         <!-- Tab: Map -->
         <div v-if="currentTab === 'map'" class="muji-card">
-            <h2 class="text-lg font-bold mb-4">地圖</h2>
-            <input v-model="destination" placeholder="輸入目的地" class="border p-2 mb-2 w-full">
-            <button @click="navigateToDestination" class="muji-button mb-4">導航</button>
-            <div id="map" class="h-64 w-full"></div>
+            <h2 class="text-lg font-bold mb-4">Map & Navigation</h2>
+            <input v-model="destination" placeholder="Enter destination" class="border p-2 mb-2 w-full rounded">
+            <button @click="navigateToDestination" class="muji-button mb-4">Navigate</button>
+            <div id="map" class="h-64 w-full rounded-lg overflow-hidden"></div>
         </div>
 
-        <!-- Tab: Accounting -->
+        <!-- Tab: Expenses -->
         <div v-if="currentTab === 'accounting'" class="muji-card">
-            <h2 class="text-lg font-bold mb-4">記帳功能</h2>
-            <ul>
-                <li v-for="(entry, index) in accounting" :key="index" class="mb-2">
-                    {{ entry.person }}: {{ entry.amount }} 元 - {{ entry.description }}
-                    <button @click="removeAccounting(index)" class="text-red-500 ml-2">刪除</button>
+            <h2 class="text-lg font-bold mb-4">Expenses</h2>
+            <ul class="mb-6">
+                <li v-for="(entry, index) in accounting" :key="index" class="mb-3 flex justify-between items-center">
+                    <span>{{ entry.person }}: {{ entry.amount }} $ - {{ entry.description }}</span>
+                    <button @click="removeAccounting(index)" class="text-red-500 text-sm">Delete</button>
                 </li>
             </ul>
-            <select v-model="newAccounting.person" class="border p-2 mb-2 w-full">
+            <select v-model="newAccounting.person" class="border p-2 mb-2 w-full rounded">
                 <option>Nickel</option>
                 <option>Lily</option>
                 <option>Candis</option>
             </select>
-            <input v-model="newAccounting.amount" type="number" placeholder="金額" class="border p-2 mb-2 w-full">
-            <input v-model="newAccounting.description" placeholder="描述" class="border p-2 mb-2 w-full">
-            <button @click="addAccounting" class="muji-button">新增支出</button>
+            <input v-model="newAccounting.amount" type="number" placeholder="Amount" class="border p-2 mb-2 w-full rounded">
+            <input v-model="newAccounting.description" placeholder="Description" class="border p-2 mb-2 w-full rounded">
+            <button @click="addAccounting" class="muji-button w-full mt-3">Add Expense</button>
         </div>
 
         <!-- Tab: Shopping List -->
         <div v-if="currentTab === 'shopping'" class="muji-card">
-            <h2 class="text-lg font-bold mb-4">購物清單</h2>
-            <ul>
-                <li v-for="(item, index) in shoppingList" :key="index" class="mb-2">
-                    {{ item }}
-                    <button @click="removeShopping(index)" class="text-red-500 ml-2">刪除</button>
+            <h2 class="text-lg font-bold mb-4">Shopping List</h2>
+            <ul class="mb-6">
+                <li v-for="(item, index) in shoppingList" :key="index" class="mb-3 flex justify-between items-center">
+                    <span>{{ item }}</span>
+                    <button @click="removeShopping(index)" class="text-red-500 text-sm">Delete</button>
                 </li>
             </ul>
-            <input v-model="newShopping" placeholder="新增項目" class="border p-2 mb-2 w-full">
-            <button @click="addShopping" class="muji-button">新增</button>
+            <input v-model="newShopping" placeholder="New item" class="border p-2 mb-2 w-full rounded">
+            <button @click="addShopping" class="muji-button w-full mt-3">Add</button>
         </div>
     </div>
 
@@ -118,7 +165,17 @@
                 return {
                     currentTab: 'schedule',
                     schedule: [],
-                    newSchedule: { time: '', event: '' },
+                    newSchedule: {
+                        type: 'normal',
+                        time: '',
+                        event: '',
+                        flightNumber: '',
+                        airline: '',
+                        departTime: '',
+                        departAirport: '',
+                        arriveTime: '',
+                        arriveAirport: ''
+                    },
                     accounting: [],
                     newAccounting: { person: 'Nickel', amount: '', description: '' },
                     shoppingList: [],
@@ -132,10 +189,30 @@
             },
             methods: {
                 addSchedule() {
-                    if (this.newSchedule.time && this.newSchedule.event) {
-                        this.schedule.push({ ...this.newSchedule });
-                        this.newSchedule = { time: '', event: '' };
+                    if (this.newSchedule.type === 'normal') {
+                        if (this.newSchedule.time && this.newSchedule.event) {
+                            this.schedule.push({ type: 'normal', ...this.newSchedule });
+                            this.resetNewSchedule();
+                        }
+                    } else if (this.newSchedule.type === 'flight') {
+                        if (this.newSchedule.flightNumber && this.newSchedule.departTime && this.newSchedule.arriveTime) {
+                            this.schedule.push({ type: 'flight', ...this.newSchedule });
+                            this.resetNewSchedule();
+                        }
                     }
+                },
+                resetNewSchedule() {
+                    this.newSchedule = {
+                        type: 'normal',
+                        time: '',
+                        event: '',
+                        flightNumber: '',
+                        airline: '',
+                        departTime: '',
+                        departAirport: '',
+                        arriveTime: '',
+                        arriveAirport: ''
+                    };
                 },
                 removeSchedule(index) {
                     this.schedule.splice(index, 1);
@@ -159,24 +236,23 @@
                     this.shoppingList.splice(index, 1);
                 },
                 async fetchWeather() {
-                    // Replace with your city and OpenWeatherMap API key
                     const apiKey = 'YOUR_OPENWEATHER_API_KEY';
-                    const city = 'Taipei'; // Change to your location
-                    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric&lang=zh_tw`;
+                    const city = 'Taipei'; // Change to your city
+                    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=metric`;
                     try {
                         const response = await fetch(url);
                         const data = await response.json();
                         this.weather = {
                             description: data.weather[0].description,
-                            temp: data.main.temp
+                            temp: Math.round(data.main.temp)
                         };
                     } catch (error) {
-                        console.error('Weather fetch error:', error);
+                        console.error('Weather error:', error);
                     }
                 },
                 initMap() {
                     this.map = new google.maps.Map(document.getElementById('map'), {
-                        center: { lat: 25.0330, lng: 121.5654 }, // Default to Taipei
+                        center: { lat: 25.0330, lng: 121.5654 },
                         zoom: 12
                     });
                     this.directionsService = new google.maps.DirectionsService();
@@ -184,26 +260,25 @@
                     this.directionsRenderer.setMap(this.map);
                 },
                 navigateToDestination() {
-                    if (this.destination) {
-                        navigator.geolocation.getCurrentPosition(position => {
-                            const origin = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
-                            const request = {
-                                origin: origin,
-                                destination: this.destination,
-                                travelMode: 'DRIVING'
-                            };
-                            this.directionsService.route(request, (result, status) => {
-                                if (status === 'OK') {
-                                    this.directionsRenderer.setDirections(result);
-                                }
-                            });
+                    if (!this.destination) return;
+                    navigator.geolocation.getCurrentPosition(position => {
+                        const origin = { lat: position.coords.latitude, lng: position.coords.longitude };
+                        const request = {
+                            origin: origin,
+                            destination: this.destination,
+                            travelMode: 'DRIVING'
+                        };
+                        this.directionsService.route(request, (result, status) => {
+                            if (status === 'OK') {
+                                this.directionsRenderer.setDirections(result);
+                            }
                         });
-                    }
+                    });
                 }
             },
             mounted() {
                 this.fetchWeather();
-                window.initMap = this.initMap; // For Google Maps callback
+                window.initMap = this.initMap;
             }
         }).mount('#app');
     </script>
