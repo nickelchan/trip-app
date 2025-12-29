@@ -23,55 +23,260 @@
         const db = firebase.firestore();
     </script>
     <style>
-        /* 同之前一樣，略 */
+        body { background-color: #f5f5f5; color: #333; font-family: 'Helvetica', sans-serif; }
+        .card { background-color: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .btn { background-color: #d2b48c; color: #fff; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+        .btn:hover { background-color: #c0a080; }
+        .text-muted { color: #808080; }
+        .tag { background-color: #e5d5c0; color: #333; padding: 4px 8px; border-radius: 999px; font-size: 0.8rem; }
+        .location-link { color: #2563eb; text-decoration: underline; }
+        .location-link:hover { color: #1d4ed8; }
+        .edit-btn { background-color: #a0a0a0; color: #fff; padding: 4px 8px; font-size: 0.8rem; border-radius: 4px; }
+        .edit-btn:hover { background-color: #909090; }
     </style>
 </head>
 <body class="max-w-md mx-auto p-4">
     <div id="app">
-        <!-- Trip Code + Tabs 同之前一樣 -->
-
-        <!-- Expenses Tab (新版) -->
-        <div v-if="currentTab === 'accounting'" class="card">
-            <h2 class="text-lg font-bold mb-4">Expenses</h2>
-
-            <div v-for="(entry, index) in sortedAccounting" :key="entry.id || index" class="card mb-4">
-                <div class="flex justify-between items-start">
-                    <div class="flex-1">
-                        <p class="font-semibold text-lg">{{ entry.amount }} {{ entry.currency }} <span class="text-sm text-muted">(≈ {{ toHKD(entry.amount, entry.currency).toFixed(2) }} HKD)</span></p>
-                        <p class="text-sm text-muted">{{ formatDate(entry.date) }} {{ entry.time || '' }}</p>
-                        <p>{{ entry.description }}</p>
-                        <p v-if="entry.store" class="text-sm text-muted mt-1"><strong>Store:</strong> {{ entry.store }}</p>
-                        <div class="flex gap-2 flex-wrap mt-2">
-                            <span class="tag">{{ entry.person }}</span>
-                        </div>
-                    </div>
-                    <div>
-                        <button @click="startEditAccounting(entry, index)" class="edit-btn mr-2">Edit</button>
-                        <button @click="removeAccounting(entry.id, index)" class="text-red-500 text-sm">Delete</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 總結區 -->
-            <div class="card mt-8 bg-amber-50">
-                <h3 class="font-bold mb-4">Trip Summary (in HKD)</h3>
-                <p>Total Expenses: <strong>{{ totalHKD.toFixed(2) }} HKD</strong></p>
-                <p>Average per person: <strong>{{ averageHKD.toFixed(2) }} HKD</strong></p>
-                <div class="mt-4">
-                    <p v-for="person in ['Nickel', 'Lily', 'Candis']" :key="person">
-                        <strong>{{ person }}:</strong> Paid {{ personPaidHKD(person).toFixed(2) }} HKD → 
-                        <span :class="settleAmount(person) > 0 ? 'text-red-600' : 'text-green-600'">
-                            {{ settleAmount(person) > 0 ? 'Owes' : 'Should receive' }} {{ Math.abs(settleAmount(person)).toFixed(2) }} HKD
-                        </span>
-                    </p>
-                </div>
-            </div>
-
-            <!-- Add/Edit Form 同之前一樣 -->
+        <!-- Trip Code Input -->
+        <div v-if="!tripCode" class="card text-center py-12">
+            <h2 class="text-2xl font-bold mb-6">一不做二不休<br>2026日韓起雙飛</h2>
+            <p class="text-muted mb-6">Enter your trip code to join</p>
+            <input v-model="inputTripCode" placeholder="e.g. 2026jpkorea" class="border p-3 mb-6 w-full rounded text-center text-lg" autofocus>
+            <button @click="joinTrip" class="btn w-full text-lg py-3">Join Trip</button>
         </div>
 
-        <!-- 其他 Tab 同之前 -->
+        <!-- Main App -->
+        <div v-else>
+            <div class="flex justify-between items-center mb-6 bg-white p-4 rounded-lg shadow-sm">
+                <h1 class="text-xl font-bold">一不做二不休 2026日韓起雙飛</h1>
+                <button @click="leaveTrip" class="text-sm text-gray-500 underline">Leave</button>
+            </div>
 
+            <div class="flex justify-around mb-6 border-b border-gray-200 bg-white sticky top-0 z-10 py-3">
+                <button @click="currentTab = 'schedule'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'schedule' }" class="pb-2 px-4">Schedule</button>
+                <button @click="currentTab = 'map'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'map' }" class="pb-2 px-4">Map</button>
+                <button @click="currentTab = 'accounting'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'accounting' }" class="pb-2 px-4">Expenses</button>
+                <button @click="currentTab = 'shopping'" :class="{ 'font-bold border-b-2 border-amber-600': currentTab === 'shopping' }" class="pb-2 px-4">Shopping List</button>
+            </div>
+
+            <!-- Schedule Tab -->
+            <div v-if="currentTab === 'schedule'" class="card">
+                <h2 class="text-lg font-bold mb-4">Schedule</h2>
+                <div v-if="weather" class="mb-4 text-muted">
+                    <p>Today's Weather: {{ weather.description }}, Temp: {{ weather.temp }}°C</p>
+                </div>
+
+                <div v-for="(item, index) in sortedSchedule" :key="item.id || index">
+                    <!-- Flight -->
+                    <div v-if="item.type === 'flight'" class="card mb-4 border-l-4 border-amber-700">
+                        <div class="flex justify-between items-center mb-3">
+                            <span class="font-bold text-lg">{{ item.flightNumber }} • {{ item.airline }}</span>
+                            <div>
+                                <button @click="startEditSchedule(item, index)" class="edit-btn mr-2">Edit</button>
+                                <button @click="removeSchedule(item.id, index)" class="text-red-500 text-sm">Delete</button>
+                            </div>
+                        </div>
+                        <p class="text-sm text-muted mb-2">{{ formatFlightDate(item.departDate, item.arriveDate) }}</p>
+                        <div class="grid grid-cols-2 gap-4 mb-3">
+                            <div>
+                                <p class="text-sm text-muted">Departure</p>
+                                <p class="font-semibold text-lg">{{ item.departTime }}</p>
+                                <p class="text-gray-600">{{ item.departAirport }}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm text-muted">Arrival</p>
+                                <p class="font-semibold text-lg">{{ item.arriveTime }}</p>
+                                <p class="text-gray-600">{{ item.arriveAirport }}</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-2 flex-wrap mb-2">
+                            <span v-for="person in item.people" :key="person" class="tag">{{ person }}</span>
+                        </div>
+                        <p v-if="item.notes" class="text-sm text-muted mt-2"><strong>Notes:</strong> {{ item.notes }}</p>
+                    </div>
+
+                    <!-- General Activity -->
+                    <div v-else class="card mb-4">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <p class="font-semibold">{{ item.time }} - {{ item.event }}</p>
+                                <p class="text-sm text-muted">{{ formatDate(item.date) }}</p>
+                                <div v-if="item.location" class="mt-2">
+                                    <a :href="'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(item.location)" target="_blank" class="location-link flex items-center">
+                                        📍 {{ item.location }}
+                                    </a>
+                                </div>
+                                <div class="flex gap-2 flex-wrap mt-2">
+                                    <span v-for="person in item.people" :key="person" class="tag">{{ person }}</span>
+                                </div>
+                                <p v-if="item.notes" class="text-sm text-muted mt-2"><strong>Notes:</strong> {{ item.notes }}</p>
+                            </div>
+                            <div>
+                                <button @click="startEditSchedule(item, index)" class="edit-btn mr-2">Edit</button>
+                                <button @click="removeSchedule(item.id, index)" class="text-red-500 text-sm">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add/Edit Form -->
+                <div class="mt-8">
+                    <h3 class="font-semibold mb-4">{{ editScheduleItem ? 'Edit Item' : 'Add New' }}</h3>
+                    <select v-model="newSchedule.type" class="border p-2 mb-3 w-full rounded">
+                        <option value="normal">General Activity</option>
+                        <option value="flight">Flight</option>
+                    </select>
+
+                    <div v-if="newSchedule.type === 'normal'">
+                        <input type="date" v-model="newSchedule.date" class="border p-2 mb-2 w-full rounded" required>
+                        <input type="time" v-model="newSchedule.time" class="border p-2 mb-2 w-full rounded" required>
+                    </div>
+
+                    <div v-if="newSchedule.type === 'flight'">
+                        <div class="grid grid-cols-2 gap-2 mb-3">
+                            <div>
+                                <p class="text-sm text-muted mb-1">Departure Date</p>
+                                <input type="date" v-model="newSchedule.departDate" class="border p-2 w-full rounded" required>
+                            </div>
+                            <div>
+                                <p class="text-sm text-muted mb-1">Arrival Date (if different)</p>
+                                <input type="date" v-model="newSchedule.arriveDate" class="border p-2 w-full rounded">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <p class="text-sm text-muted mb-2">Who?</p>
+                        <label class="flex items-center mb-2"><input type="checkbox" v-model="newSchedule.people" value="Nickel" class="mr-2"> Nickel</label>
+                        <label class="flex items-center mb-2"><input type="checkbox" v-model="newSchedule.people" value="Lily" class="mr-2"> Lily</label>
+                        <label class="flex items-center mb-2"><input type="checkbox" v-model="newSchedule.people" value="Candis" class="mr-2"> Candis</label>
+                    </div>
+
+                    <div v-if="newSchedule.type === 'normal'">
+                        <input v-model="newSchedule.event" placeholder="Event" class="border p-2 mb-2 w-full rounded" required>
+                        <input v-model="newSchedule.location" placeholder="Location (e.g. Seoul Tower)" class="border p-2 mb-2 w-full rounded">
+                    </div>
+
+                    <div v-if="newSchedule.type === 'flight'">
+                        <input v-model="newSchedule.flightNumber" placeholder="Flight Number" class="border p-2 mb-2 w-full rounded" required>
+                        <input v-model="newSchedule.airline" placeholder="Airline" class="border p-2 mb-2 w-full rounded">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <input v-model="newSchedule.departTime" placeholder="Depart Time" class="border p-2 mb-2 w-full rounded" required>
+                                <input v-model="newSchedule.departAirport" placeholder="Depart Airport" class="border p-2 mb-2 w-full rounded" required>
+                            </div>
+                            <div>
+                                <input v-model="newSchedule.arriveTime" placeholder="Arrive Time" class="border p-2 mb-2 w-full rounded" required>
+                                <input v-model="newSchedule.arriveAirport" placeholder="Arrive Airport" class="border p-2 mb-2 w-full rounded" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <textarea v-model="newSchedule.notes" placeholder="Notes (optional)" class="border p-2 mb-3 w-full rounded h-24"></textarea>
+
+                    <div class="flex gap-2">
+                        <button @click="saveSchedule" class="btn flex-1">{{ editScheduleItem ? 'Save Changes' : 'Add' }}</button>
+                        <button v-if="editScheduleItem" @click="cancelEditSchedule" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Map Tab -->
+            <div v-if="currentTab === 'map'" class="card">
+                <h2 class="text-lg font-bold mb-4">Map & Navigation</h2>
+                <input v-model="destination" placeholder="Enter destination" class="border p-2 mb-2 w-full rounded">
+                <button @click="navigateToDestination" class="btn mb-4 w-full">Navigate</button>
+                <div id="map" class="h-80 w-full rounded-lg overflow-hidden"></div>
+            </div>
+
+            <!-- Expenses Tab -->
+            <div v-if="currentTab === 'accounting'" class="card">
+                <h2 class="text-lg font-bold mb-4">Expenses</h2>
+
+                <div v-for="(entry, index) in sortedAccounting" :key="entry.id || index" class="card mb-4">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <p class="font-semibold text-lg">{{ entry.amount }} {{ entry.currency }}
+                                <span class="text-sm text-muted">(≈ {{ toHKD(entry.amount, entry.currency).toFixed(2) }} HKD)</span>
+                            </p>
+                            <p class="text-sm text-muted">{{ formatDate(entry.date) }} {{ entry.time || '' }}</p>
+                            <p>{{ entry.description }}</p>
+                            <p v-if="entry.store" class="text-sm text-muted mt-1"><strong>Store:</strong> {{ entry.store }}</p>
+                            <div class="flex gap-2 flex-wrap mt-2">
+                                <span class="tag">{{ entry.person }}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <button @click="startEditAccounting(entry, index)" class="edit-btn mr-2">Edit</button>
+                            <button @click="removeAccounting(entry.id, index)" class="text-red-500 text-sm">Delete</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settlement Summary -->
+                <div v-if="accounting.length > 0" class="card mt-8 bg-amber-50 border-amber-300">
+                    <h3 class="font-bold mb-4 text-lg">Trip Settlement (HKD)</h3>
+                    <p class="mb-2"><strong>Total Expenses:</strong> {{ totalHKD.toFixed(2) }} HKD</p>
+                    <p class="mb-4"><strong>Average per person:</strong> {{ averageHKD.toFixed(2) }} HKD</p>
+                    <div class="space-y-3">
+                        <div v-for="person in ['Nickel', 'Lily', 'Candis']" :key="person" class="flex justify-between items-center">
+                            <span><strong>{{ person }}</strong> paid {{ personPaidHKD(person).toFixed(2) }} HKD</span>
+                            <span :class="settleAmount(person) > 0 ? 'text-red-600 font-bold' : 'text-green-600 font-bold'">
+                                {{ settleAmount(person) > 0 ? '→ Owes' : '→ Gets back' }} {{ Math.abs(settleAmount(person)).toFixed(2) }} HKD
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add/Edit Form -->
+                <div class="mt-8">
+                    <h3 class="font-semibold mb-4">{{ editAccountingItem ? 'Edit Expense' : 'Add Expense' }}</h3>
+                    <input type="date" v-model="newAccounting.date" class="border p-2 mb-2 w-full rounded" required>
+                    <input type="time" v-model="newAccounting.time" class="border p-2 mb-2 w-full rounded">
+                    <select v-model="newAccounting.person" class="border p-2 mb-2 w-full rounded">
+                        <option>Nickel</option>
+                        <option>Lily</option>
+                        <option>Candis</option>
+                    </select>
+                    <input v-model="newAccounting.amount" type="number" placeholder="Amount" class="border p-2 mb-2 w-full rounded" required>
+                    <select v-model="newAccounting.currency" class="border p-2 mb-2 w-full rounded">
+                        <option value="HKD">HKD</option>
+                        <option value="CAD">CAD</option>
+                        <option value="JPY">JPY</option>
+                        <option value="KRW">KRW</option>
+                    </select>
+                    <input v-model="newAccounting.description" placeholder="Description" class="border p-2 mb-2 w-full rounded" required>
+                    <input v-model="newAccounting.store" placeholder="Store / Shop (optional)" class="border p-2 mb-2 w-full rounded">
+                    <div class="flex gap-2 mt-4">
+                        <button @click="saveAccounting" class="btn flex-1">{{ editAccountingItem ? 'Save Changes' : 'Add Expense' }}</button>
+                        <button v-if="editAccountingItem" @click="cancelEditAccounting" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Shopping List Tab -->
+            <div v-if="currentTab === 'shopping'" class="card">
+                <h2 class="text-lg font-bold mb-4">Shopping List</h2>
+                <ul class="mb-6">
+                    <li v-for="(item, index) in shoppingList" :key="item.id || index" class="mb-3 flex justify-between items-center">
+                        <span>{{ item.text }}</span>
+                        <div>
+                            <button @click="startEditShopping(item, index)" class="edit-btn mr-2">Edit</button>
+                            <button @click="removeShopping(item.id, index)" class="text-red-500 text-sm">Delete</button>
+                        </div>
+                    </li>
+                </ul>
+
+                <div class="mt-8">
+                    <h3 class="font-semibold mb-4">{{ editShoppingItem ? 'Edit Item' : 'Add New Item' }}</h3>
+                    <input v-model="newShopping" placeholder="Item name" class="border p-2 mb-2 w-full rounded">
+                    <div class="flex gap-2 mt-4">
+                        <button @click="saveShopping" class="btn flex-1">{{ editShoppingItem ? 'Save Changes' : 'Add' }}</button>
+                        <button v-if="editShoppingItem" @click="cancelEditShopping" class="bg-gray-500 text-white px-4 py-2 rounded">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -79,24 +284,164 @@
         createApp({
             data() {
                 return {
-                    // ... 所有之前 data
+                    tripCode: localStorage.getItem('tripCode') || '',
+                    inputTripCode: '',
+                    currentTab: 'schedule',
+                    schedule: [],
+                    newSchedule: {
+                        type: 'normal', date: '', time: '', event: '', location: '',
+                        flightNumber: '', airline: '', departDate: '', departTime: '', departAirport: '',
+                        arriveDate: '', arriveTime: '', arriveAirport: '', notes: '', people: []
+                    },
+                    editScheduleItem: null,
+                    editScheduleIndex: null,
+                    accounting: [],
+                    newAccounting: { person: 'Nickel', amount: '', currency: 'HKD', description: '', store: '', date: '', time: '' },
+                    editAccountingItem: null,
+                    editAccountingIndex: null,
+                    shoppingList: [],
+                    newShopping: '',
+                    editShoppingItem: null,
+                    editShoppingIndex: null,
+                    weather: null,
+                    destination: '',
+                    map: null,
+                    directionsService: null,
+                    directionsRenderer: null
                 };
             },
             computed: {
-                // ... 之前 computed
+                sortedSchedule() {
+                    return [...this.schedule].sort((a, b) => {
+                        const dateA = a.type === 'flight' ? a.departDate : a.date;
+                        const dateB = b.type === 'flight' ? b.departDate : b.date;
+                        return dateA.localeCompare(dateB);
+                    });
+                },
+                sortedAccounting() {
+                    return [...this.accounting].sort((a, b) => b.date.localeCompare(a.date));
+                },
                 totalHKD() {
-                    return this.accounting.reduce((sum, entry) => sum + this.toHKD(entry.amount, entry.currency), 0);
+                    return this.accounting.reduce((sum, e) => sum + this.toHKD(e.amount, e.currency), 0);
+                },
+                averageHKD() {
+                    return this.totalHKD / 3;
                 }
             },
             methods: {
-                // ... 之前所有 methods
+                joinTrip() {
+                    if (this.inputTripCode.trim()) {
+                        this.tripCode = this.inputTripCode.trim().toLowerCase();
+                        localStorage.setItem('tripCode', this.tripCode);
+                        this.loadAllData();
+                        this.setupRealtimeSync();
+                    }
+                },
+                leaveTrip() {
+                    if (confirm('Leave this trip? All local data will be cleared.')) {
+                        localStorage.removeItem('tripCode');
+                        location.reload();
+                    }
+                },
+                async loadAllData() {
+                    const tripDoc = db.collection('trips').doc(this.tripCode);
+                    const doc = await tripDoc.get();
+                    if (doc.exists) {
+                        const data = doc.data();
+                        this.schedule = data.schedule || [];
+                        this.accounting = data.accounting || [];
+                        this.shoppingList = data.shoppingList || [];
+                    } else {
+                        await tripDoc.set({ schedule: [], accounting: [], shoppingList: [] });
+                    }
+                },
+                setupRealtimeSync() {
+                    const tripDoc = db.collection('trips').doc(this.tripCode);
+                    tripDoc.onSnapshot((doc) => {
+                        if (doc.exists) {
+                            const data = doc.data();
+                            this.schedule = data.schedule || [];
+                            this.accounting = data.accounting || [];
+                            this.shoppingList = data.shoppingList || [];
+                        }
+                    });
+                },
+                async saveToCloud() {
+                    const tripDoc = db.collection('trips').doc(this.tripCode);
+                    await tripDoc.set({
+                        schedule: this.schedule,
+                        accounting: this.accounting,
+                        shoppingList: this.shoppingList
+                    });
+                },
+                // Schedule methods...
+                startEditSchedule(item, index) {
+                    this.editScheduleItem = { ...item };
+                    this.editScheduleIndex = index;
+                    this.newSchedule = { ...item, people: [...item.people] };
+                },
+                cancelEditSchedule() {
+                    this.editScheduleItem = null;
+                    this.editScheduleIndex = null;
+                    this.resetNewSchedule();
+                },
+                async saveSchedule() {
+                    if (this.newSchedule.people.length === 0) return;
+                    const valid = (this.newSchedule.type === 'normal' && this.newSchedule.date && this.newSchedule.time && this.newSchedule.event) ||
+                                  (this.newSchedule.type === 'flight' && this.newSchedule.departDate && this.newSchedule.departTime && this.newSchedule.arriveTime && this.newSchedule.flightNumber);
+                    if (valid) {
+                        const item = { ...this.newSchedule, id: this.editScheduleItem ? this.editScheduleItem.id : Date.now().toString() };
+                        if (this.editScheduleItem) {
+                            this.schedule[this.editScheduleIndex] = item;
+                        } else {
+                            this.schedule.push(item);
+                        }
+                        await this.saveToCloud();
+                        this.cancelEditSchedule();
+                    }
+                },
+                async removeSchedule(id, index) {
+                    if (confirm('Delete this item?')) {
+                        this.schedule.splice(index, 1);
+                        await this.saveToCloud();
+                    }
+                },
+                resetNewSchedule() {
+                    this.newSchedule = { type: 'normal', date: '', time: '', event: '', location: '',
+                        flightNumber: '', airline: '', departDate: '', departTime: '', departAirport: '',
+                        arriveDate: '', arriveTime: '', arriveAirport: '', notes: '', people: [] };
+                },
+                // Expenses methods...
+                startEditAccounting(item, index) {
+                    this.editAccountingItem = { ...item };
+                    this.editAccountingIndex = index;
+                    this.newAccounting = { ...item };
+                },
+                cancelEditAccounting() {
+                    this.editAccountingItem = null;
+                    this.editAccountingIndex = null;
+                    this.newAccounting = { person: 'Nickel', amount: '', currency: 'HKD', description: '', store: '', date: '', time: '' };
+                },
+                async saveAccounting() {
+                    if (this.newAccounting.date && this.newAccounting.amount && this.newAccounting.description) {
+                        const item = { ...this.newAccounting, id: this.editAccountingItem ? this.editAccountingItem.id : Date.now().toString() };
+                        if (this.editAccountingItem) {
+                            this.accounting[this.editAccountingIndex] = item;
+                        } else {
+                            this.accounting.push(item);
+                        }
+                        await this.saveToCloud();
+                        this.cancelEditAccounting();
+                    }
+                },
+                async removeAccounting(id, index) {
+                    if (confirm('Delete this expense?')) {
+                        this.accounting.splice(index, 1);
+                        await this.saveToCloud();
+                    }
+                },
                 toHKD(amount, currency) {
-                    const rates = {
-                        HKD: 1,
-                        CAD: 5.68,
-                        JPY: 0.0497,
-                        KRW: 0.0054
-                    };
+                    const rates = { HKD: 1, CAD: 5.68, JPY: 0.0497, KRW: 0.0054 };
                     return amount * (rates[currency] || 1);
                 },
                 personPaidHKD(person) {
@@ -104,12 +449,72 @@
                         .filter(e => e.person === person)
                         .reduce((sum, e) => sum + this.toHKD(e.amount, e.currency), 0);
                 },
-                averageHKD() {
-                    return this.totalHKD / 3;
-                },
                 settleAmount(person) {
                     return this.personPaidHKD(person) - this.averageHKD();
+                },
+                // Shopping methods...
+                startEditShopping(item, index) {
+                    this.editShoppingItem = { ...item };
+                    this.editShoppingIndex = index;
+                    this.newShopping = item.text;
+                },
+                cancelEditShopping() {
+                    this.editShoppingItem = null;
+                    this.editShoppingIndex = null;
+                    this.newShopping = '';
+                },
+                async saveShopping() {
+                    if (this.newShopping.trim()) {
+                        const item = { text: this.newShopping.trim(), id: this.editShoppingItem ? this.editShoppingItem.id : Date.now().toString() };
+                        if (this.editShoppingItem) {
+                            this.shoppingList[this.editShoppingIndex] = item;
+                        } else {
+                            this.shoppingList.push(item);
+                        }
+                        await this.saveToCloud();
+                        this.cancelEditShopping();
+                    }
+                },
+                async removeShopping(id, index) {
+                    if (confirm('Delete this item?')) {
+                        this.shoppingList.splice(index, 1);
+                        await this.saveToCloud();
+                    }
+                },
+                formatDate(dateStr) {
+                    if (!dateStr) return '';
+                    const date = new Date(dateStr);
+                    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                },
+                formatFlightDate(depart, arrive) {
+                    if (!depart) return '';
+                    const d = this.formatDate(depart);
+                    if (arrive && depart !== arrive) return d + ' → ' + this.formatDate(arrive);
+                    return d;
+                },
+                initMap() {
+                    this.map = new google.maps.Map(document.getElementById('map'), { center: { lat: 37.5665, lng: 126.9780 }, zoom: 12 });
+                    this.directionsService = new google.maps.DirectionsService();
+                    this.directionsRenderer = new google.maps.DirectionsRenderer();
+                    this.directionsRenderer.setMap(this.map);
+                },
+                navigateToDestination() {
+                    if (!this.destination) return;
+                    navigator.geolocation.getCurrentPosition(position => {
+                        const origin = { lat: position.coords.latitude, lng: position.coords.longitude };
+                        const request = { origin, destination: this.destination, travelMode: 'DRIVING' };
+                        this.directionsService.route(request, (result, status) => {
+                            if (status === 'OK') this.directionsRenderer.setDirections(result);
+                        });
+                    }, () => alert('Location access denied. Please enable it in Safari settings for navigation to work.'));
                 }
+            },
+            mounted() {
+                if (this.tripCode) {
+                    this.loadAllData();
+                    this.setupRealtimeSync();
+                }
+                window.initMap = this.initMap;
             }
         }).mount('#app');
     </script>
